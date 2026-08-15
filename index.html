@@ -416,11 +416,11 @@ async function searchBus(){
 
     const {data,error} =
       await supabaseClient
-      .from("stops")
+      .from("bus_stops")
       .select("*")
       .or(
-        `name.ilike.%${query}%,city.ilike.%${query}%`
-      );
+  `stop_name.ilike.%${query}%,city.ilike.%${query}%`
+);
 
     if(error){
 
@@ -444,7 +444,7 @@ async function searchBus(){
         <div class="result-card">
 
           <h3>
-            📍 ${stop.name || "-"}
+            📍 ${stop.stop_name || "-"}
           </h3>
 
           <p>
