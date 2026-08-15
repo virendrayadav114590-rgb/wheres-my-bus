@@ -305,9 +305,16 @@ async function searchBus(){
       .ilike("bus_number",`%${query}%`);
 
     if(error){
-
-      showError(error);
-      return;
+    results.innerHTML = `
+        <div class="empty">
+            <b>Supabase Error</b><br><br>
+            ${error.message || "Unknown error"}<br><br>
+            Code: ${error.code || "-"}<br>
+            Details: ${error.details || "-"}
+        </div>
+    `;
+    console.error(error);
+    return;
     }
 
     if(!data || data.length === 0){
