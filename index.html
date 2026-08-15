@@ -359,10 +359,10 @@ async function searchBus(){
 
     const {data,error} =
       await supabaseClient
-      .from("routes")
+      .from("bus_routes")
       .select("*")
       .or(
-        `name.ilike.%${query}%,source.ilike.%${query}%,destination.ilike.%${query}%`
+        `route_name.ilike.%${query}%,route_number.ilike.%${query}%,source.ilike.%${query}%,destination.ilike.%${query}%`
       );
 
     if(error){
