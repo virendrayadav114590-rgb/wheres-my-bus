@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Where's My Bus 🚌</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #f4f7fb;
+      color: #1f2937;
+    }
+
+    header {
+      background: #0f766e;
+      color: white;
+      padding: 22px 18px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 25px auto;
+      padding: 0 16px;
+    }
+
+    .search-box {
+      background: white;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    }
+
+    .search-box h2 {
+      margin-bottom: 15px;
+      font-size: 20px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: #0f766e;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #0f766e;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #115e59;
+    }
+
+    .quick-search {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 15px;
+    }
+
+    .quick-search button {
+      background: #e6fffb;
+      color: #0f766e;
+      font-size: 13px;
+      padding: 10px 5px;
+    }
+
+    .results {
+      margin-top: 20px;
+    }
+
+    .result-card {
+      background: white;
+      padding: 18px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.07);
+    }
+
+    .result-card h3 {
+      color: #0f766e;
+      margin-bottom: 8px;
+    }
+
+    .result-card p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+
+    .status {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 5px 9px;
+      border-radius: 20px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 25px;
+      color: #6b7280;
+    }
+
+    footer {
+      text-align: center;
+      padding: 30px 10px;
+      color: #6b7280;
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>🚌 Where's My Bus?</h1>
+  <p>Find buses, routes and stops easily</p>
+</header>
+
+<div class="container">
+
+  <div class="search-box">
+
+    <h2>🔎 Search Bus</h2>
+
+    <select id="searchType">
+      <option value="bus">Bus Number</option>
+      <option value="route">Route</option>
+      <option value="stop">Bus Stop</option>
+    </select>
+
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Enter bus number..."
+    >
+
+    <button onclick="searchBus()">Search</button>
+
+    <div class="quick-search">
+      <button onclick="quickSearch('bus')">🚌 Bus</button>
+      <button onclick="quickSearch('route')">🛣️ Route</button>
+      <button onclick="quickSearch('stop')">📍 Stop</button>
+    </div>
+
+  </div>
+
+  <div class="results" id="results">
+    <div class="empty">
+      Search for a bus, route or stop
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Where's My Bus 🚌 | Powered by Supabase
+</footer>
+
+<script>
+
+  const buses = [
+    {
+      number: "UP32AB1234",
+      route: "Lucknow → Hazratganj",
+      stop: "Hazratganj",
+      status: "Active"
+    }
+  ];
+
+  const routes = [
+    {
+      name: "Lucknow City Route",
+      source: "Lucknow",
+      destination: "Hazratganj",
+      bus: "UP32AB1234"
+    }
+  ];
+
+  const stops = [
+    {
+      name: "Hazratganj",
+      city: "Lucknow",
+      bus: "UP32AB1234"
+    }
+  ];
+
+  const searchType = document.getElementById("searchType");
+  const searchInput = document.getElementById("searchInput");
+
+  searchType.addEventListener("change", function() {
+
+    if (this.value === "bus") {
+      searchInput.placeholder = "Enter bus number...";
+    }
+
+    if (this.value === "route") {
+      searchInput.placeholder = "Enter route name...";
+    }
+
+    if (this.value === "stop") {
+      searchInput.placeholder = "Enter bus stop...";
+    }
+
+  });
+
+  function quickSearch(type) {
+    searchType.value = type;
+    searchType.dispatchEvent(new Event("change"));
+    searchInput.focus();
+  }
+
+  function searchBus() {
+
+    const type = searchType.value;
+    const query = searchInput.value.trim().toLowerCase();
+
+    const results = document.getElementById("results");
+
+    if (!query) {
+      results.innerHTML = `
+        <div class="empty">
+          Please enter something to search.
+        </div>
+      `;
+      return;
+    }
+
+    let found = [];
+
+    if (type === "bus") {
+
+      found = buses.filter(bus =>
+        bus.number.toLowerCase().includes(query)
+      );
+
+      results.innerHTML = found.length
+        ? found.map(bus => `
+          <div class="result-card">
+            <h3>🚌 ${bus.number}</h3>
+            <p>🛣️ Route: ${bus.route}</p>
+            <p>📍 Stop: ${bus.stop}</p>
+            <span class="status">● ${bus.status}</span>
+          </div>
+        `).join("")
+        : `<div class="empty">No bus found.</div>`;
+
+    }
+
+    if (type === "route") {
+
+      found = routes.filter(route =>
+        route.name.toLowerCase().includes(query) ||
+        route.source.toLowerCase().includes(query) ||
+        route.destination.toLowerCase().includes(query)
+      );
+
+      results.innerHTML = found.length
+        ? found.map(route => `
+          <div class="result-card">
+            <h3>🛣️ ${route.name}</h3>
+            <p>📍 From: ${route.source}</p>
+            <p>📍 To: ${route.destination}</p>
+            <p>🚌 Bus: ${route.bus}</p>
+          </div>
+        `).join("")
+        : `<div class="empty">No route found.</div>`;
+
+    }
+
+    if (type === "stop") {
+
+      found = stops.filter(stop =>
+        stop.name.toLowerCase().includes(query) ||
+        stop.city.toLowerCase().includes(query)
+      );
+
+      results.innerHTML = found.length
+        ? found.map(stop => `
+          <div class="result-card">
+            <h3>📍 ${stop.name}</h3>
+            <p>🏙️ City: ${stop.city}</p>
+            <p>🚌 Bus: ${stop.bus}</p>
+          </div>
+        `).join("")
+        : `<div class="empty">No stop found.</div>`;
+
+    }
+
+  }
+
+</script>
+
+</body>
+</html>
