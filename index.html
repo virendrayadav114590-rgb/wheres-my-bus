@@ -496,8 +496,8 @@ async function loadBuses(){
 
   async function loadBusLocations(){
 
-  if(mapReady){
-    initMap();
+  if(!mapReady){
+  initBusMap();
   }
 
   const { data, error } = await supabaseClient
