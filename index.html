@@ -268,7 +268,7 @@ footer{
    ========================================================= */
 
 const SUPABASE_URL = "https://zfbeauaerfaxarqicvgb.supabase.co";
-const SUPABASE_KEY = "sb_publishable_Q3aYd1Fp4q1lpK2KCXgd4g_uO0Ba0bE";
+const SUPABASE_KEY = "sb_publishable_Q3aYd1Fp4q1lpK2Kcxgd4g_uO0Ba0e";
 
 const supabaseClient = supabase.createClient(
   SUPABASE_URL,
@@ -343,6 +343,42 @@ function showEmpty(message){
   results.innerHTML = `
     <div class="empty">${escapeHTML(message)}</div>
   `;
+}
+
+function getLocationStatus(updatedAt){
+  if(!updatedAt){
+    return {
+      label:"🔴 Offline",
+      className:"inactive",
+      text:"No live location received"
+    };
+  }
+
+  const updated = new Date(updatedAt);
+  const seconds = Math.max(0, Math.floor((Date.now() - updated.getTime()) / 1000));
+
+  if(seconds <= 60){
+    return {
+      label:"🟢 Live",
+      className:"",
+      text:`Updated ${seconds} sec ago`
+    };
+  }
+
+  if(seconds <= 300){
+    const minutes = Math.floor(seconds / 60);
+    return {
+      label:"🟡 Stale",
+      className:"",
+      text:`Updated ${minutes} min ago`
+    };
+  }
+
+  return {
+    label:"🔴 Offline",
+    className:"inactive",
+    text:`Last update ${Math.floor(seconds / 60)} min ago`
+  };
 }
 
 /* =========================================================
@@ -562,6 +598,10 @@ async function searchBus(value = searchInput.value){
     const inactive =
       String(status).toLowerCase() === "inactive";
 
+    const liveStatus = getLocationStatus(
+      location?.updated_at
+    );
+
     results.innerHTML += `
       <div class="result-card">
         <h3>🚌 ${escapeHTML(bus.bus_number || "-")}</h3>
@@ -590,6 +630,14 @@ async function searchBus(value = searchInput.value){
         <span class="status ${inactive ? "inactive" : ""}">
           ${escapeHTML(status)}
         </span>
+
+        <div style="margin-top:10px;font-weight:bold">
+          ${escapeHTML(liveStatus.label)}
+        </div>
+
+        <div style="margin-top:5px;color:#6b7280;font-size:13px">
+          ${escapeHTML(liveStatus.text)}
+        </div>
       </div>
     `;
 
@@ -968,3 +1016,4 @@ window.addEventListener(
 
 </body>
 </html>
+
