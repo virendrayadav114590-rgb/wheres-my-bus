@@ -533,7 +533,44 @@ async function loadBusLocations(){
 
   console.log("Bus locations loaded:",data.length);
 }
+// ================================================
+// ROUTE STOPS
+// ================================================
 
+async function loadRouteStops(routeId){
+
+  const { data: routeStops, error } = await supabaseClient
+    .from("route_stops")
+    .select("route_id, stop_id")
+    .eq("route_id", routeId);
+
+  if(error){
+    console.error("Route stops error:", error);
+    return [];
+  }
+
+  if(!routeStops || routeStops.length === 0){
+    return [];
+  }
+
+  const stopIds = routeStops
+    .map(row => row.stop_id)
+    .filter(Boolean);
+
+  const { data: stops, error: stopError } = await supabaseClient
+    .from("bus_stops")
+    .select("*")
+    .in("id", stopIds);
+
+  if(stopError){
+    console.error("Stops error:", stopError);
+    return [];
+  }
+
+  return (stops || []).sort(
+    (a,b) => Number(a.sequence_no || 0) - Number(b.sequence_no || 0)
+  );
+}
 /* =========================================================
    BUS SEARCH
    ========================================================= */
@@ -590,7 +627,13 @@ async function searchBus(value = searchInput.value){
       bus.route_name ||
       bus.route ||
       "-";
+  let routeStops = [];
 
+const routeId = Number(bus.route);
+
+if(Number.isFinite(routeId) && routeId > 0){
+  routeStops = await loadRouteStops(routeId);
+}
     const status =
       bus.status ||
       "Active";
