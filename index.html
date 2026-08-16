@@ -585,7 +585,82 @@ async function searchBus(value = searchInput.value){
   }
 
   showLoading();
+if (searchType.value === "route") {
 
+  const { data: routes, error: routeError } =
+    await supabaseClient
+      .from("bus_routes")
+      .select("*")
+      .or(
+        `route_name.ilike.%${text}%,route_number.ilike.%${text}%,source.ilike.%${text}%,destination.ilike.%${text}%`
+      );
+
+  if (routeError) {
+    showError(routeError);
+    return;
+  }
+
+  if (!routes || routes.length === 0) {
+    showEmpty("🛣️ No route found.");
+    return;
+  }
+
+  results.innerHTML = "";
+
+  for (const route of routes) {
+
+    const routeStops = await loadRouteStops(route.id);
+
+    results.innerHTML += `
+      <div class="result-card">
+
+        <h3>🛣️ ${escapeHTML(route.route_name || "-")}</h3>
+
+        <p>
+          <strong>Route Number:</strong>
+          ${escapeHTML(route.route_number || "-")}
+        </p>
+
+        <p>
+          <strong>From:</strong>
+          ${escapeHTML(route.source || "-")}
+        </p>
+
+        <p>
+          <strong>To:</strong>
+          ${escapeHTML(route.destination || "-")}
+        </p>
+
+        ${
+          routeStops.length
+            ? `
+              <div style="margin-top:10px;">
+                <strong>📍 Route Stops:</strong>
+
+                <ol style="margin-top:6px;padding-left:22px;">
+                  ${routeStops.map(stop => `
+                    <li>
+                      ${escapeHTML(stop.stop_name || "-")}
+                      ${
+                        stop.city
+                          ? ` - ${escapeHTML(stop.city)}`
+                          : ""
+                      }
+                    </li>
+                  `).join("")}
+                </ol>
+
+              </div>
+            `
+            : ""
+        }
+
+      </div>
+    `;
+  }
+
+  return;
+}
   const {data,error} =
     await supabaseClient
       .from("buses")
