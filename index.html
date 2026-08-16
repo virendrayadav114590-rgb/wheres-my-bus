@@ -229,26 +229,79 @@ supabase.createClient(
 const searchType =
 document.getElementById("searchType");
 
-const searchInput =
+  const searchInput =
 document.getElementById("searchInput");
+  const busSelect = document.createElement("select");
+busSelect.id = "busSelect";
+busSelect.style.display = "none";
 
+searchInput.parentNode.insertBefore(
+    busSelect,
+    searchInput
+);
+  async function loadBuses(){
 
-searchType.addEventListener("change",function(){
+    const { data, error } = await supabaseClient
+        .from("buses")
+        .select("bus_number,bus_name")
+        .order("bus_number");
 
-  if(this.value === "bus"){
-    searchInput.placeholder =
-      "Enter bus number...";
+    if(error){
+        console.error("Bus loading error:", error);
+        return;
+    }
+
+    busSelect.innerHTML = "";
+
+    data.forEach(bus => {
+
+        const option = document.createElement("option");
+
+        option.value = bus.bus_number;
+
+        option.textContent =
+            bus.bus_number +
+            (bus.bus_name ? " - " + bus.bus_name : "");
+
+        busSelect.appendChild(option);
+
+    });
+
+    if(data.length > 0){
+
+        busSelect.value = data[0].bus_number;
+
+        searchInput.value = data[0].bus_number;
+
+        searchBus();
+
+    }
   }
+searchType.addEventListener("change", function(){
 
-  if(this.value === "route"){
-    searchInput.placeholder =
-      "Enter route name...";
-  }
+    if(this.value === "bus"){
 
-  if(this.value === "stop"){
-    searchInput.placeholder =
-      "Enter bus stop...";
-  }
+        searchInput.style.display = "none";
+        busSelect.style.display = "block";
+
+        loadBuses();
+
+    } else {
+
+        searchInput.style.display = "block";
+        busSelect.style.display = "none";
+
+        if(this.value === "route"){
+            searchInput.placeholder =
+            "Enter route name...";
+        }
+
+        if(this.value === "stop"){
+            searchInput.placeholder =
+            "Enter bus stop...";
+        }
+
+    }
 
 });
 
