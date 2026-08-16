@@ -301,1163 +301,697 @@ footer{
 <script>
 
 /* =========================================================
-   SUPABASE CONFIGURATION
+   WHERE'S MY BUS - FINAL JAVASCRIPT
    ========================================================= */
 
-/*
-   IMPORTANT:
-   नीचे अपनी CURRENT working Supabase URL और
-   CURRENT publishable key exactly वही रखें
-   जो आपके पुराने code में है.
-*/
-
 const SUPABASE_URL = "https://zfbeauaerfaxarqicvgb.supabase.co";
-
-const SUPABASE_KEY = "sb_publishable_Q3aYd1Fp4q1lpK2KCXgd4g_uO0Ba0bE";
-
+const SUPABASE_KEY = "sb_publishable_Q3aYd1Fp4q1lpK2Kcxgd4g_uO0Ba0e";
 
 const supabaseClient = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
+    SUPABASE_URL,
+    SUPABASE_KEY
 );
-
 
 /* =========================================================
    GLOBAL VARIABLES
    ========================================================= */
 
 let busMap = null;
-
 let busMarkers = {};
-
 let allBuses = [];
-
 let mapReady = false;
-
 
 /* =========================================================
    DOM ELEMENTS
    ========================================================= */
 
-const searchType =
-  document.getElementById("searchType");
-
-const searchInput =
-  document.getElementById("searchInput");
-
-const results =
-  document.getElementById("results");
-
+const searchType = document.getElementById("searchType");
+const searchInput = document.getElementById("searchInput");
+const results = document.getElementById("results");
 
 /* =========================================================
    SEARCH PLACEHOLDER
    ========================================================= */
 
-searchType.addEventListener("change", function(){
+function updatePlaceholder() {
 
-  const type = searchType.value;
+    if (!searchType || !searchInput) return;
 
-  if(type === "bus"){
-    searchInput.placeholder =
-      "Enter bus number...";
-  }
+    const type = searchType.value;
 
-  if(type === "route"){
-    searchInput.placeholder =
-      "Enter route name...";
-  }
+    if (type === "bus") {
+        searchInput.placeholder = "Enter bus number...";
+    }
 
-  if(type === "stop"){
-    searchInput.placeholder =
-      "Enter bus stop...";
-  }
+    else if (type === "route") {
+        searchInput.placeholder = "Enter route...";
+    }
 
-});
+    else if (type === "stop") {
+        searchInput.placeholder = "Enter bus stop...";
+    }
+}
 
+if (searchType) {
+    searchType.addEventListener("change", updatePlaceholder);
+    updatePlaceholder();
+}
 
 /* =========================================================
-   QUICK SEARCH
+   MAP INITIALIZATION
    ========================================================= */
 
-function quickSearch(type){
+function initBusMap() {
 
-  searchType.value = type;
+    if (busMap) return;
 
-  searchType.dispatchEvent(
-    new Event("change")
-  );
+    const mapElement = document.getElementById("map");
 
-  searchInput.focus();
+    if (!mapElement) {
+        console.error("Map element not found");
+        return;
+    }
 
-}
-
-
-/* =========================================================
-   HELPERS
-   ========================================================= */
-
-function escapeHTML(value){
-
-  if(value === null || value === undefined){
-    return "";
-  }
-
-  return String(value)
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#039;");
-
-}
-
-
-function showLoading(message="Searching..."){
-
-  results.innerHTML = `
-    <div class="loading">
-      ⏳ ${escapeHTML(message)}
-    </div>
-  `;
-
-}
-
-
-function showError(error){
-
-  console.error(error);
-
-  const message =
-    error?.message ||
-    error?.details ||
-    error?.hint ||
-    "Unknown database error";
-
-  results.innerHTML = `
-    <div class="error">
-      <strong>⚠️ Database Error</strong>
-      <br><br>
-      ${escapeHTML(message)}
-    </div>
-  `;
-
-}
-
-
-function showEmpty(message){
-
-  results.innerHTML = `
-    <div class="empty">
-      ${escapeHTML(message)}
-    </div>
-  `;
-
-}
-
-
-/* =========================================================
-   LOAD BUS DROPDOWN
-   ========================================================= */
-
-async function loadBuses(){
-
-  const {data,error} =
-    await supabaseClient
-      .from("buses")
-      .select("*")
-      .order("bus_number");
-
-  if(error){
-
-    console.error(
-      "Bus loading error:",
-      error
+    busMap = L.map("map").setView(
+        [26.8467, 80.9462],
+        12
     );
 
-    return;
-  }
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 19,
+            attribution:
+                '&copy; OpenStreetMap contributors'
+        }
+    ).addTo(busMap);
 
-  allBuses = data || [];
-
+    mapReady = true;
 }
 
+/* =========================================================
+   CLEAR MARKERS
+   ========================================================= */
+
+function clearMarkers() {
+
+    Object.values(busMarkers).forEach(marker => {
+
+        if (busMap && busMap.hasLayer(marker)) {
+            busMap.removeLayer(marker);
+        }
+
+    });
+
+    busMarkers = {};
+}
+
+/* =========================================================
+   CREATE BUS MARKER
+   ========================================================= */
+
+function addBusMarker(bus, latitude, longitude) {
+
+    if (!busMap || !latitude || !longitude) return;
+
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+
+    if (
+        Number.isNaN(lat) ||
+        Number.isNaN(lng)
+    ) {
+        return;
+    }
+
+    const icon = L.divIcon({
+        className: "bus-marker",
+        html: "🚌",
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+    });
+
+    const marker = L.marker(
+        [lat, lng],
+        { icon }
+    ).addTo(busMap);
+
+    marker.bindPopup(`
+        <div style="font-size:15px">
+            <strong>🚌 ${bus.bus_number || ""}</strong><br>
+            ${bus.bus_name || ""}<br>
+            ${bus.route || ""}
+        </div>
+    `);
+
+    busMarkers[bus.id] = marker;
+}
+
+/* =========================================================
+   LOAD BUSES
+   ========================================================= */
+
+async function loadBuses() {
+
+    const { data, error } =
+        await supabaseClient
+            .from("buses")
+            .select("*")
+            .order("bus_number");
+
+    if (error) {
+
+        console.error(
+            "Error loading buses:",
+            error
+        );
+
+        return;
+    }
+
+    allBuses = data || [];
+
+    console.log(
+        "Buses loaded:",
+        allBuses.length
+    );
+}
+
+/* =========================================================
+   LOAD BUS LOCATIONS
+   ========================================================= */
+
+async function loadBusLocations() {
+
+    if (!mapReady) {
+        initBusMap();
+    }
+
+    const { data, error } =
+        await supabaseClient
+            .from("bus_locations")
+            .select("*");
+
+    if (error) {
+
+        console.error(
+            "Error loading locations:",
+            error
+        );
+
+        return;
+    }
+
+    clearMarkers();
+
+    if (!data || data.length === 0) {
+        console.log("No bus locations available");
+        return;
+    }
+
+    data.forEach(location => {
+
+        const bus =
+            allBuses.find(
+                b => Number(b.id) === Number(location.bus_id)
+            );
+
+        if (!bus) return;
+
+        addBusMarker(
+            bus,
+            location.latitude,
+            location.longitude
+        );
+    });
+
+    console.log(
+        "Bus locations loaded:",
+        data.length
+    );
+}
+
+/* =========================================================
+   SHOW BUS RESULT
+   ========================================================= */
+
+function showBusResult(bus, location = null) {
+
+    if (!results) return;
+
+    results.innerHTML = `
+        <div class="result-card">
+
+            <h3>
+                🚌 ${bus.bus_number || "Bus"}
+            </h3>
+
+            <p>
+                <strong>Bus Name:</strong>
+                ${bus.bus_name || "UPSRTC Bus"}
+            </p>
+
+            <p>
+                🛣️
+                <strong>Route:</strong>
+                ${bus.route || "Route information unavailable"}
+            </p>
+
+            ${
+                bus.stop_name
+                ? `
+                <p>
+                    📍
+                    <strong>Stop:</strong>
+                    ${bus.stop_name}
+                </p>
+                `
+                : ""
+            }
+
+            <span class="active-badge">
+                Active
+            </span>
+
+        </div>
+    `;
+
+    if (
+        location &&
+        busMap &&
+        location.latitude &&
+        location.longitude
+    ) {
+
+        const lat = Number(location.latitude);
+        const lng = Number(location.longitude);
+
+        busMap.setView(
+            [lat, lng],
+            15
+        );
+
+        const marker = busMarkers[bus.id];
+
+        if (marker) {
+            marker.openPopup();
+        }
+    }
+}
 
 /* =========================================================
    BUS SEARCH
    ========================================================= */
 
-async function searchBus(){
+async function searchBus(value) {
 
-  const type =
-    searchType.value;
+    const text = value.trim();
 
-  const query =
-    searchInput.value.trim();
+    if (!text) return;
 
-  if(!query){
-
-    showEmpty(
-      "Please enter something to search."
-    );
-
-    return;
-  }
-
-  showLoading();
-
-  try{
-
-    /* ==========================================
-       BUS NUMBER SEARCH
-       ========================================== */
-
-    if(type === "bus"){
-
-      const {data,error} =
+    const { data, error } =
         await supabaseClient
-          .from("buses")
-          .select("*")
-          .ilike(
-            "bus_number",
-            `%${query}%`
-          );
-
-      if(error){
-        showError(error);
-        return;
-      }
-
-      if(!data || data.length === 0){
-
-        showEmpty(
-          "🚌 No bus found."
-        );
-
-        return;
-      }
-
-      renderBusResults(data);
-
-      return;
-    }
-
-
-    /* ==========================================
-       ROUTE SEARCH
-       ========================================== */
-
-    if(type === "route"){
-
-      let data = null;
-      let error = null;
-
-
-      /*
-         First try route_name
-      */
-
-      const first =
-        await supabaseClient
-          .from("buses")
-          .select("*")
-          .ilike(
-            "route_name",
-            `%${query}%`
-          );
-
-
-      if(!first.error){
-
-        data = first.data || [];
-
-      }else{
-
-        /*
-           If route_name does not exist,
-           try route
-        */
-
-        const second =
-          await supabaseClient
             .from("buses")
             .select("*")
-            .ilike(
-              "route",
-              `%${query}%`
-            );
+            .ilike("bus_number", `%${text}%`);
 
-        data = second.data;
-        error = second.error;
+    if (error) {
 
-      }
+        console.error(error);
 
-
-      if(error){
-
-        showError(error);
-        return;
-
-      }
-
-
-      if(!data || data.length === 0){
-
-        showEmpty(
-          "🛣️ No route found."
-        );
+        results.innerHTML =
+            "<p>Unable to search bus.</p>";
 
         return;
-
-      }
-
-
-      renderRouteResults(data);
-
-      return;
     }
 
+    if (!data || data.length === 0) {
 
-    /* ==========================================
-       STOP SEARCH
-       ========================================== */
+        results.innerHTML =
+            "<p>No bus found.</p>";
 
-    if(type === "stop"){
+        return;
+    }
 
-      const stopResult =
+    const bus = data[0];
+
+    const { data: location } =
         await supabaseClient
-          .from("bus_stops")
-          .select("*")
-          .or(
-            `stop_name.ilike.%${query}%,city.ilike.%${query}%`
-          );
-
-
-      if(stopResult.error){
-
-        showError(stopResult.error);
-
-        return;
-
-      }
-
-
-      const stops =
-        stopResult.data || [];
-
-
-      if(stops.length === 0){
-
-        showEmpty(
-          "📍 No bus stop found."
-        );
-
-        return;
-
-      }
-
-
-      await renderStopResults(stops);
-
-      return;
-    }
-
-  }catch(error){
-
-    showError(error);
-
-  }
-
-}
-
-
-/* =========================================================
-   RENDER BUS RESULTS
-   ========================================================= */
-
-function renderBusResults(data){
-
-  results.innerHTML =
-    data.map(bus => {
-
-      const active =
-        bus.is_active !== false;
-
-      const status =
-        bus.status ||
-        (active ? "Active" : "Inactive");
-
-
-      const route =
-        bus.route_name ||
-        bus.route ||
-        bus.routeName ||
-        "-";
-
-
-      const stop =
-        bus.stop ||
-        bus.stop_name ||
-        "-";
-
-
-      const busName =
-        bus.bus_name ||
-        bus.name ||
-        "";
-
-
-      return `
-
-        <div class="result-card">
-
-          <h3>
-            🚌 ${escapeHTML(
-              bus.bus_number || "-"
-            )}
-          </h3>
-
-          ${
-            busName
-            ? `
-              <p>
-                <strong>Bus Name:</strong>
-                ${escapeHTML(busName)}
-              </p>
-            `
-            : ""
-          }
-
-          <p>
-            🛣️ <strong>Route:</strong>
-            ${escapeHTML(route)}
-          </p>
-
-          <p>
-            📍 <strong>Stop:</strong>
-            ${escapeHTML(stop)}
-          </p>
-
-          <span class="status ${
-            active ? "" : "inactive"
-          }">
-            ${escapeHTML(status)}
-          </span>
-
-        </div>
-
-      `;
-
-    }).join("");
-
-}
-
-
-/* =========================================================
-   RENDER ROUTE RESULTS
-   ========================================================= */
-
-function renderRouteResults(data){
-
-  results.innerHTML =
-    data.map(bus => {
-
-      const route =
-        bus.route_name ||
-        bus.route ||
-        "-";
-
-      return `
-
-        <div class="result-card">
-
-          <h3>
-            🛣️ ${escapeHTML(route)}
-          </h3>
-
-          <p>
-            🚌 <strong>Bus:</strong>
-            ${escapeHTML(
-              bus.bus_number || "-"
-            )}
-          </p>
-
-          ${
-            bus.bus_name
-            ? `
-              <p>
-                <strong>Bus Name:</strong>
-                ${escapeHTML(bus.bus_name)}
-              </p>
-            `
-            : ""
-          }
-
-          <p>
-            📍 <strong>Stop:</strong>
-            ${escapeHTML(
-              bus.stop ||
-              bus.stop_name ||
-              "-"
-            )}
-          </p>
-
-        </div>
-
-      `;
-
-    }).join("");
-
-}
-
-
-/* =========================================================
-   STOP RESULTS
-   ========================================================= */
-
-async function renderStopResults(stops){
-
-  const cards =
-    await Promise.all(
-
-      stops.map(async stop => {
-
-        let bus = null;
-
-
-        if(stop.bus_id){
-
-          const response =
-            await supabaseClient
-              .from("buses")
-              .select("*")
-              .eq(
-                "id",
-                stop.bus_id
-              )
-              .maybeSingle();
-
-          bus =
-            response.data || null;
-
-        }
-
-
-        const route =
-          bus?.route_name ||
-          bus?.route ||
-          "-";
-
-
-        const busNumber =
-          bus?.bus_number ||
-          stop.bus_number ||
-          "-";
-
-
-        const busName =
-          bus?.bus_name ||
-          stop.bus_name ||
-          "";
-
-
-        return `
-
-          <div class="result-card">
-
-            <h3>
-              📍 ${escapeHTML(
-                stop.stop_name || "-"
-              )}
-            </h3>
-
-            <p>
-              🏙️ <strong>City:</strong>
-              ${escapeHTML(
-                stop.city || "-"
-              )}
-            </p>
-
-            <p>
-              🚌 <strong>Bus:</strong>
-              ${escapeHTML(busNumber)}
-              ${
-                busName
-                ? " - " +
-                  escapeHTML(busName)
-                : ""
-              }
-            </p>
-
-            <p>
-              🛣️ <strong>Route:</strong>
-              ${escapeHTML(route)}
-            </p>
-
-          </div>
-
-        `;
-
-      })
-
-    );
-
-
-  results.innerHTML =
-    cards.join("");
-
-}
-
-
-/* =========================================================
-   INITIALIZE MAP
-   ========================================================= */
-
-function initBusMap(){
-
-  if(mapReady){
-    return;
-  }
-
-  busMap =
-    L.map("map").setView(
-      [26.8467,80.9462],
-      12
-    );
-
-
-  L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-      attribution:
-        "&copy; OpenStreetMap contributors"
-    }
-  ).addTo(busMap);
-
-
-  mapReady = true;
-
-}
-
-
-/* =========================================================
-   CREATE / UPDATE BUS MARKER
-   ========================================================= */
-
-function updateBusMarker(bus){
-
-  if(!bus){
-    return;
-  }
-
-
-  if(
-    bus.latitude === null ||
-    bus.latitude === undefined ||
-    bus.longitude === null ||
-    bus.longitude === undefined
-  ){
-    return;
-  }
-
-
-  const lat =
-    Number(bus.latitude);
-
-  const lng =
-    Number(bus.longitude);
-
-
-  if(
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lng)
-  ){
-    return;
-  }
-
-
-  if(!mapReady){
-    initBusMap();
-  }
-
-
-  const busNumber =
-    bus.bus_number ||
-    "Bus";
-
-
-  const speed =
-    bus.speed_kmh ??
-    bus.speed ??
-    0;
-
-
-  const heading =
-    bus.heading ??
-    "-";
-
-
-  const status =
-    bus.status ||
-    (
-      bus.is_active === false
-      ? "Inactive"
-      : "Active"
-    );
-
-
-  const popup = `
-
-    <div>
-
-      <strong>
-        🚌 ${escapeHTML(busNumber)}
-      </strong>
-
-      <br>
-
-      Speed:
-      ${escapeHTML(speed)} km/h
-
-      <br>
-
-      Heading:
-      ${escapeHTML(heading)}
-
-      <br>
-
-      Status:
-      ${escapeHTML(status)}
-
-      <br><br>
-
-      <small>
-        ${escapeHTML(
-          bus.updated_at || ""
-        )}
-      </small>
-
-    </div>
-
-  `;
-
-
-  if(busMarkers[busNumber]){
-
-    busMarkers[busNumber]
-      .setLatLng([lat,lng])
-      .setPopupContent(popup);
-
-  }else{
-
-    const marker =
-      L.marker([lat,lng])
-        .addTo(busMap)
-        .bindPopup(popup);
-
-
-    busMarkers[busNumber] =
-      marker;
-
-  }
-
-}
-
-
-/* =========================================================
-   LOAD CURRENT BUS LOCATIONS
-   ========================================================= */
-
-async function loadBusLocations(){
-
-  try{
-
-    const {
-      data,
-      error
-    } =
-      await supabaseClient
-        .from("bus_locations")
-        .select("*");
-
-
-    if(error){
-
-      console.error(
-        "Location loading error:",
-        error
-      );
-
-      return;
-
-    }
-
-
-    if(!data || data.length === 0){
-
-      console.log(
-        "No active bus locations found."
-      );
-
-      return;
-
-    }
-
-
-    for(
-      const location of data
-    ){
-
-      let busInfo = null;
-
-
-      if(location.bus_id){
-
-        const response =
-          await supabaseClient
-            .from("buses")
+            .from("bus_locations")
             .select("*")
-            .eq(
-              "id",
-              location.bus_id
-            )
+            .eq("bus_id", bus.id)
+            .order("updated_at", {
+                ascending: false
+            })
+            .limit(1)
             .maybeSingle();
 
-
-        busInfo =
-          response.data || null;
-
-      }
-
-
-      if(busInfo){
-
-        updateBusMarker({
-
-          ...busInfo,
-
-          ...location
-
-        });
-
-      }else{
-
-        updateBusMarker(location);
-
-      }
-
-    }
-
-  }catch(error){
-
-    console.error(
-      "Location error:",
-      error
+    showBusResult(
+        bus,
+        location
     );
-
-  }
-
 }
 
-
 /* =========================================================
-   REALTIME BUS LOCATION
+   ROUTE SEARCH
    ========================================================= */
 
-function subscribeRealtime(){
+async function searchRoute(value) {
 
-  supabaseClient
+    const text = value.trim();
 
-    .channel("live-bus-locations")
+    if (!text) return;
 
-    .on(
-      "postgres_changes",
+    const { data, error } =
+        await supabaseClient
+            .from("buses")
+            .select("*")
+            .ilike("route", `%${text}%`);
 
-      {
-        event:"*",
-        schema:"public",
-        table:"bus_locations"
-      },
+    if (error) {
 
-      async payload => {
+        console.error(error);
 
-        console.log(
-          "Live location update:",
-          payload
-        );
+        results.innerHTML =
+            "<p>Unable to search route.</p>";
 
+        return;
+    }
 
-        /* =====================================
-           DELETE
-           ===================================== */
+    if (!data || data.length === 0) {
 
-        if(
-          payload.eventType === "DELETE"
-        ){
+        results.innerHTML =
+            "<p>No route found.</p>";
 
-          const oldLocation =
-            payload.old;
+        return;
+    }
 
+    results.innerHTML =
+        data.map(bus => `
 
-          if(
-            oldLocation &&
-            oldLocation.bus_id
-          ){
+            <div class="result-card">
 
-            /*
-              Find marker by bus number
-              through current buses table.
-            */
+                <h3>
+                    🛣️ ${bus.route || ""}
+                </h3>
 
-            const response =
-              await supabaseClient
+                <p>
+                    🚌
+                    <strong>Bus:</strong>
+                    ${bus.bus_number || ""}
+                </p>
+
+                <p>
+                    <strong>Bus Name:</strong>
+                    ${bus.bus_name || ""}
+                </p>
+
+            </div>
+
+        `).join("");
+}
+
+/* =========================================================
+   STOP SEARCH
+   ========================================================= */
+
+async function searchStop(value) {
+
+    const text = value.trim();
+
+    if (!text) return;
+
+    const { data, error } =
+        await supabaseClient
+            .from("bus_stops")
+            .select("*")
+            .ilike("stop_name", `%${text}%`);
+
+    if (error) {
+
+        console.error(error);
+
+        results.innerHTML =
+            "<p>Unable to search stop.</p>";
+
+        return;
+    }
+
+    if (!data || data.length === 0) {
+
+        results.innerHTML =
+            "<p>No stop found.</p>";
+
+        return;
+    }
+
+    const busIds =
+        data
+            .map(x => x.bus_id)
+            .filter(Boolean);
+
+    let buses = [];
+
+    if (busIds.length > 0) {
+
+        const response =
+            await supabaseClient
                 .from("buses")
-                .select("bus_number")
-                .eq(
-                  "id",
-                  oldLocation.bus_id
-                )
-                .maybeSingle();
+                .select("*")
+                .in("id", busIds);
 
+        buses = response.data || [];
+    }
 
-            const busNumber =
-              response.data?.bus_number;
+    results.innerHTML =
+        data.map(stop => {
 
+            const bus =
+                buses.find(
+                    b => Number(b.id) === Number(stop.bus_id)
+                );
 
-            if(
-              busNumber &&
-              busMarkers[busNumber]
-            ){
+            return `
 
-              busMap.removeLayer(
-                busMarkers[busNumber]
-              );
+                <div class="result-card">
 
+                    <h3>
+                        📍 ${stop.stop_name || ""}
+                    </h3>
 
-              delete
-                busMarkers[busNumber];
+                    <p>
+                        🏙️
+                        <strong>City:</strong>
+                        ${stop.city || ""}
+                    </p>
+
+                    ${
+                        bus
+                        ? `
+                        <p>
+                            🚌
+                            <strong>Bus:</strong>
+                            ${bus.bus_number}
+                        </p>
+
+                        <p>
+                            <strong>Bus Name:</strong>
+                            ${bus.bus_name || ""}
+                        </p>
+
+                        <p>
+                            🛣️
+                            <strong>Route:</strong>
+                            ${bus.route || ""}
+                        </p>
+                        `
+                        : ""
+                    }
+
+                </div>
+
+            `;
+
+        }).join("");
+}
+
+/* =========================================================
+   MAIN SEARCH
+   ========================================================= */
+
+async function performSearch() {
+
+    const type =
+        searchType
+        ? searchType.value
+        : "bus";
+
+    const value =
+        searchInput
+        ? searchInput.value
+        : "";
+
+    if (!value.trim()) {
+
+        if (results) {
+            results.innerHTML =
+                "<p>Please enter a search value.</p>";
+        }
+
+        return;
+    }
+
+    if (type === "bus") {
+        await searchBus(value);
+    }
+
+    else if (type === "route") {
+        await searchRoute(value);
+    }
+
+    else if (type === "stop") {
+        await searchStop(value);
+    }
+}
+
+/* =========================================================
+   SEARCH BUTTON
+   ========================================================= */
+
+const searchButton =
+    document.querySelector(
+        'button[type="submit"]'
+    );
+
+if (searchButton) {
+
+    searchButton.addEventListener(
+        "click",
+        function(event) {
+
+            event.preventDefault();
+            performSearch();
+
+        }
+    );
+}
+
+/* =========================================================
+   ENTER KEY SEARCH
+   ========================================================= */
+
+if (searchInput) {
+
+    searchInput.addEventListener(
+        "keydown",
+        function(event) {
+
+            if (event.key === "Enter") {
+
+                event.preventDefault();
+                performSearch();
 
             }
 
-          }
-
-          return;
-
         }
-
-
-        /* =====================================
-           INSERT / UPDATE
-           ===================================== */
-
-        const location =
-          payload.new;
-
-
-        if(
-          !location ||
-          !location.bus_id
-        ){
-          return;
-        }
-
-
-        const {
-          data:busInfo,
-          error
-        } =
-          await supabaseClient
-            .from("buses")
-            .select("*")
-            .eq(
-              "id",
-              location.bus_id
-            )
-            .maybeSingle();
-
-
-        if(error){
-
-          console.error(
-            "Realtime bus details error:",
-            error
-          );
-
-          return;
-
-        }
-
-
-        if(busInfo){
-
-          updateBusMarker({
-
-            ...busInfo,
-
-            ...location
-
-          });
-
-        }
-
-      }
-
-    )
-
-    .subscribe(status => {
-
-      console.log(
-        "Realtime status:",
-        status
-      );
-
-    });
-
+    );
 }
 
-
 /* =========================================================
-   SEARCH BUS FROM DROPDOWN
+   QUICK SEARCH BUTTONS
    ========================================================= */
 
-async function searchSelectedBus(busNumber){
+function quickSearch(type) {
 
-  if(!busNumber){
-    return;
-  }
+    if (!searchType || !searchInput) return;
 
+    searchType.value = type;
 
-  searchType.value = "bus";
+    updatePlaceholder();
 
-  searchInput.value = busNumber;
+    searchInput.focus();
+}
 
-  await searchBus();
+/* =========================================================
+   REALTIME LOCATION UPDATES
+   ========================================================= */
 
+function subscribeRealtime() {
 
-  /*
-     Also open live location if available.
-  */
+    supabaseClient
+        .channel("bus-location-updates")
 
-  const {
-    data:bus
-  } =
-    await supabaseClient
-      .from("buses")
-      .select("*")
-      .eq(
-        "bus_number",
-        busNumber
-      )
-      .maybeSingle();
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "bus_locations"
+            },
+            async function(payload) {
 
+                console.log(
+                    "Live location update:",
+                    payload
+                );
 
-  if(!bus){
-    return;
-  }
+                await loadBusLocations();
+            }
+        )
 
+        .subscribe();
 
-  const {
-    data:location
-  } =
-    await supabaseClient
-      .from("bus_locations")
-      .select("*")
-      .eq(
-        "bus_id",
-        bus.id
-      )
-      .maybeSingle();
+    console.log(
+        "Realtime bus tracking connected."
+    );
+}
 
+/* =========================================================
+   PERIODIC REFRESH
+   ========================================================= */
 
-  if(location){
+async function refreshMap() {
 
-    updateBusMarker({
-
-      ...bus,
-
-      ...location
-
-    });
-
-    const lat =
-      Number(location.latitude);
-
-    const lng =
-      Number(location.longitude);
-
-
-    if(
-      Number.isFinite(lat) &&
-      Number.isFinite(lng)
-    ){
-
-      busMap.setView(
-        [lat,lng],
-        15
-      );
-
+    if (!mapReady) {
+        initBusMap();
     }
 
-  }
-
+    await loadBusLocations();
 }
 
+/* Refresh every 30 seconds */
 
-/* =========================================================
-   MAP REFRESH
-   ========================================================= */
-
-async function refreshMap(){
-
-  if(!mapReady){
-    initBusMap();
-  }
-
-  await loadBusLocations();
-
-}
-
+setInterval(
+    refreshMap,
+    30000
+);
 
 /* =========================================================
    START APPLICATION
    ========================================================= */
 
 window.addEventListener(
-  "load",
-  async function(){
+    "load",
+    async function() {
 
-    console.log(
-      "Where's My Bus starting..."
-    );
+        console.log(
+            "🚌 Where's My Bus starting..."
+        );
 
+        initBusMap();
 
-    /* Initialize map */
+        await loadBuses();
 
-    initBusMap();
+        await loadBusLocations();
 
+        subscribeRealtime();
 
-    /* Load buses */
+        console.log(
+            "🚌 Where's My Bus ready."
+        );
 
-    await loadBuses();
-
-
-    /* Load current locations */
-
-    await loadBusLocations();
-
-
-    /* Start realtime */
-
-    subscribeRealtime();
-
-
-    console.log(
-      "Where's My Bus ready."
-    );
-
-  }
+    }
 );
-
-</script>
 
 </body>
 </html>
