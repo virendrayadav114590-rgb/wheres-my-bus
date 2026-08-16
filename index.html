@@ -685,9 +685,14 @@ supabaseClient
 
             const bus = payload.new;
 
-            if (bus && bus.is_active) {
-                updateBusMarker(bus);
-            }
+if (bus && bus.is_active) {
+  updateBusMarker(bus);
+} else if (bus && bus.bus_number) {
+  if (busMarkers[bus.bus_number]) {
+    busMap.removeLayer(busMarkers[bus.bus_number]);
+    delete busMarkers[bus.bus_number];
+  }
+}
         }
     )
     .subscribe(status => {
