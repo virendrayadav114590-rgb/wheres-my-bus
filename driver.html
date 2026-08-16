@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where's My Bus? — Driver</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  background:#f4f7fb;
+  color:#1f2937;
+  min-height:100vh;
+}
+header{
+  background:#087f73;
+  color:#fff;
+  text-align:center;
+  padding:25px 16px;
+}
+header h1{font-size:28px;margin-bottom:7px}
+header p{font-size:15px}
+.container{
+  max-width:520px;
+  margin:22px auto;
+  padding:0 16px;
+}
+.card{
+  background:#fff;
+  padding:20px;
+  border-radius:18px;
+  box-shadow:0 5px 20px rgba(0,0,0,.08);
+  margin-bottom:16px;
+}
+label{
+  display:block;
+  font-weight:bold;
+  margin-bottom:8px;
+}
+select,button{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  font-size:16px;
+}
+select{
+  border:1px solid #d1d5db;
+  background:#fff;
+  margin-bottom:12px;
+}
+button{
+  border:0;
+  background:#087f73;
+  color:#fff;
+  font-weight:bold;
+  cursor:pointer;
+  margin-top:8px;
+}
+button.stop{background:#b91c1c}
+button:disabled{opacity:.55;cursor:not-allowed}
+.status{
+  padding:13px;
+  border-radius:12px;
+  background:#f3f4f6;
+  margin-bottom:14px;
+  line-height:1.5;
+}
+.status.live{
+  background:#dcfce7;
+  color:#166534;
+}
+.status.error{
+  background:#fff1f2;
+  color:#be123c;
+}
+.data{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.item{
+  background:#f8fafc;
+  border-radius:12px;
+  padding:12px;
+}
+.item small{
+  display:block;
+  color:#6b7280;
+  margin-bottom:5px;
+}
+.item strong{word-break:break-word}
+.note{
+  color:#6b7280;
+  font-size:13px;
+  line-height:1.5;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚌 Driver Live Tracking</h1>
+  <p>Where's My Bus?</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <label for="busSelect">Select Bus</label>
+    <select id="busSelect">
+      <option value="">Loading buses...</option>
+    </select>
+
+    <button id="startBtn" type="button">▶️ Start Trip</button>
+    <button id="stopBtn" type="button" class="stop" disabled>⏹️ Stop Trip</button>
+  </div>
+
+  <div class="card">
+    <div id="status" class="status">
+      ⚪ Select a bus and press Start Trip.
+    </div>
+
+    <div class="data">
+      <div class="item">
+        <small>Latitude</small>
+        <strong id="latitude">—</strong>
+      </div>
+      <div class="item">
+        <small>Longitude</small>
+        <strong id="longitude">—</strong>
+      </div>
+      <div class="item">
+        <small>Accuracy</small>
+        <strong id="accuracy">—</strong>
+      </div>
+      <div class="item">
+        <small>Last Update</small>
+        <strong id="updated">—</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="card note">
+    📍 GPS permission must be allowed in the browser. Keep this page open during the trip for the most reliable browser-based tracking.
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://zfbeauaerfaxarqicvgb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Q3aYd1Fp4q1lpK2Kcxgd4g_uO0Ba0e";
+
+const supabaseClient = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+const busSelect = document.getElementById("busSelect");
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const statusBox = document.getElementById("status");
+const latitudeBox = document.getElementById("latitude");
+const longitudeBox = document.getElementById("longitude");
+const accuracyBox = document.getElementById("accuracy");
+const updatedBox = document.getElementById("updated");
+
+let watchId = null;
+let selectedBusId = null;
+let sending = false;
+
+function setStatus(message, type=""){
+  statusBox.textContent = message;
+  statusBox.className = "status" + (type ? " " + type : "");
+}
+
+function showPosition(position){
+  const {latitude, longitude, accuracy} = position.coords;
+  latitudeBox.textContent = latitude.toFixed(6);
+  longitudeBox.textContent = longitude.toFixed(6);
+  accuracyBox.textContent = `${Math.round(accuracy)} m`;
+  updatedBox.textContent = new Date().toLocaleTimeString();
+}
+
+async function loadBuses(){
+  const {data, error} = await supabaseClient
+    .from("buses")
+    .select("id,bus_number,bus_name")
+    .order("bus_number");
+
+  if(error){
+    console.error(error);
+    busSelect.innerHTML = '<option value="">Unable to load buses</option>';
+    setStatus("❌ Could not load buses from Supabase.", "error");
+    return;
+  }
+
+  busSelect.innerHTML = '<option value="">Select bus...</option>';
+
+  (data || []).forEach(bus => {
+    const option = document.createElement("option");
+    option.value = bus.id;
+    option.textContent =
+      `${bus.bus_number}${bus.bus_name ? " — " + bus.bus_name : ""}`;
+    busSelect.appendChild(option);
+  });
+}
+
+/*
+  bus_locations currently does not have a UNIQUE constraint on bus_id.
+  Therefore we first UPDATE the selected bus row; if no row exists,
+  we INSERT one.
+*/
+async function saveLocation(position){
+  if(!selectedBusId || sending) return;
+
+  sending = true;
+
+  const latitude = position.coords.latitude;
+  const longitude = position.coords.longitude;
+
+  try{
+    const {data:updatedRows, error:updateError} = await supabaseClient
+      .from("bus_locations")
+      .update({
+        latitude,
+        longitude,
+        updated_at:new Date().toISOString()
+      })
+      .eq("bus_id", selectedBusId)
+      .select("id");
+
+    if(updateError) throw updateError;
+
+    if(!updatedRows || updatedRows.length === 0){
+      const {error:insertError} = await supabaseClient
+        .from("bus_locations")
+        .insert({
+          bus_id:selectedBusId,
+          latitude,
+          longitude,
+          updated_at:new Date().toISOString()
+        });
+
+      if(insertError) throw insertError;
+    }
+
+    showPosition(position);
+    setStatus("🟢 Live tracking is ON", "live");
+
+  }catch(error){
+    console.error(error);
+    setStatus(
+      "❌ Location could not be saved: " + (error.message || "Unknown error"),
+      "error"
+    );
+  }finally{
+    sending = false;
+  }
+}
+
+function gpsError(error){
+  let message = "GPS error.";
+
+  if(error.code === 1){
+    message = "GPS permission denied. Allow location access in browser settings.";
+  }else if(error.code === 2){
+    message = "GPS location is unavailable. Move to an area with better GPS signal.";
+  }else if(error.code === 3){
+    message = "GPS request timed out. Trying again...";
+  }
+
+  console.error(error);
+  setStatus("❌ " + message, "error");
+}
+
+function startTrip(){
+  if(!busSelect.value){
+    setStatus("⚠️ Please select a bus first.", "error");
+    return;
+  }
+
+  if(!navigator.geolocation){
+    setStatus("❌ This browser does not support GPS.", "error");
+    return;
+  }
+
+  selectedBusId = busSelect.value;
+
+  setStatus("📍 Requesting GPS permission...");
+
+  watchId = navigator.geolocation.watchPosition(
+    saveLocation,
+    gpsError,
+    {
+      enableHighAccuracy:true,
+      maximumAge:5000,
+      timeout:20000
+    }
+  );
+
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  busSelect.disabled = true;
+
+  setStatus("📍 GPS tracking started. Waiting for location...");
+}
+
+function stopTrip(){
+  if(watchId !== null){
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
+  selectedBusId = null;
+  sending = false;
+
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+  busSelect.disabled = false;
+
+  setStatus("⚪ Trip stopped.");
+}
+
+startBtn.addEventListener("click", startTrip);
+stopBtn.addEventListener("click", stopTrip);
+
+window.addEventListener("beforeunload", () => {
+  if(watchId !== null){
+    navigator.geolocation.clearWatch(watchId);
+  }
+});
+
+loadBuses();
+</script>
+</body>
+</html>
