@@ -604,9 +604,25 @@ async function loadBusLocations() {
         return;
     }
 
-    data.forEach(bus => {
-        updateBusMarker(bus);
+    for (const location of data) {
+  const { data: busInfo, error: busError } = await supabaseClient
+    .from("buses")
+    .select("*")
+    .eq("id", location.bus_id)
+    .maybeSingle();
+
+  if (busError) {
+    console.error("Bus details error:", busError);
+    continue;
+  }
+
+  if (busInfo) {
+    updateBusMarker({
+      ...busInfo,
+      ...location
     });
+  }
+    }
 }
 
 
@@ -683,14 +699,27 @@ supabaseClient
                 return;
             }
 
-            const bus = payload.new;
+            const location = payload.new;
 
-if (bus && bus.is_active) {
-  updateBusMarker(bus);
-} else if (bus && bus.bus_number) {
-  if (busMarkers[bus.bus_number]) {
-    busMap.removeLayer(busMarkers[bus.bus_number]);
-    delete busMarkers[bus.bus_number];
+if (location && location.bus_id) {
+  const { data: busInfo, error: busError } = await supabaseClient
+    .from("buses")
+    .select("*")
+    .eq("id", location.bus_id)
+    .maybeSingle();
+
+  if (busError) {
+    console.error("Realtime bus details error:", busError);
+    return;
+  }
+
+  if (busInfo) {
+    updateBusMarker({
+      ...busInfo,
+      ...location
+    });
+  }
+}
   }
 }
         }
