@@ -541,7 +541,7 @@ async function loadRouteStops(routeId){
 
   const { data: routeStops, error } = await supabaseClient
     .from("route_stops")
-    "route_id, stop_id, sequence_no"
+    .select("route_id, stop_id, sequence_no")
     .eq("route_id", routeId);
 
   if(error){
