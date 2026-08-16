@@ -813,7 +813,6 @@ ${
 /* =========================================================
    ROUTE SEARCH
    ========================================================= */
-
 async function searchRoute(value){
 
   const text = String(value || "").trim();
@@ -825,75 +824,90 @@ async function searchRoute(value){
 
   showLoading();
 
-  let data = null;
-  let error = null;
-
-  /* Prefer the confirmed route column */
-  const first =
+  const { data: routes, error: routeError } =
     await supabaseClient
-      .from("buses")
+      .from("bus_routes")
       .select("*")
-      .ilike("route",`%${text}%`);
+      .or(
+        `route_name.ilike.%${text}%,route_number.ilike.%${text}%,source.ilike.%${text}%,destination.ilike.%${text}%`
+      );
 
-  if(!first.error){
-    data = first.data || [];
-  }else{
-
-    const second =
-      await supabaseClient
-        .from("buses")
-        .select("*")
-        .ilike("route_name",`%${text}%`);
-
-    data = second.data || [];
-    error = second.error;
-  }
-
-  if(error){
-    showError(error);
+  if(routeError){
+    showError(routeError);
     return;
   }
 
-  if(!data.length){
+  if(!routes || routes.length === 0){
     showEmpty("🛣️ No route found.");
     return;
   }
 
-  results.innerHTML =
-    data.map(bus => {
+  results.innerHTML = "";
 
-      const route =
-        bus.route_name ||
-        bus.route ||
-        "-";
+  for(const route of routes){
 
-      return `
-        <div class="result-card">
-          <h3>🛣️ ${escapeHTML(route)}</h3>
+    const routeStops = await loadRouteStops(route.id);
 
-          <p>
-            🚌 <strong>Bus:</strong>
-            ${escapeHTML(bus.bus_number || "-")}
-          </p>
+    results.innerHTML += `
+      <div class="result-card">
 
-          <p>
-            <strong>Bus Name:</strong>
-            ${escapeHTML(bus.bus_name || "-")}
-          </p>
+        <h3>🛣️ ${escapeHTML(route.route_name || "-")}</h3>
 
-          ${
-            bus.stop || bus.stop_name
-            ? `
-              <p>
-                📍 <strong>Stop:</strong>
-                ${escapeHTML(bus.stop || bus.stop_name)}
-              </p>
-            `
-            : ""
-          }
-        </div>
-      `;
-    }).join("");
+        <p>
+          <strong>Route Number:</strong>
+          ${escapeHTML(route.route_number || "-")}
+        </p>
+
+        <p>
+          <strong>From:</strong>
+          ${escapeHTML(route.source || "-")}
+        </p>
+
+        <p>
+          <strong>To:</strong>
+          ${escapeHTML(route.destination || "-")}
+        </p>
+
+        ${
+          route.total_stops
+          ? `
+            <p>
+              <strong>Total Stops:</strong>
+              ${escapeHTML(String(route.total_stops))}
+            </p>
+          `
+          : ""
+        }
+
+        ${
+          routeStops && routeStops.length
+          ? `
+            <div style="margin-top:10px;">
+              <strong>📍 Route Stops:</strong>
+
+              <ol style="margin-top:6px;padding-left:22px;">
+                ${
+                  routeStops.map(stop => `
+                    <li>
+                      ${escapeHTML(stop.stop_name || "-")}
+                      ${
+                        stop.city
+                        ? ` - ${escapeHTML(stop.city)}`
+                        : ""
+                      }
+                    </li>
+                  `).join("")
+                }
+              </ol>
+
+            </div>
+          `
+          : ""
+        }
+
+      </div>
+    `;
+  }
 }
 
 /* =========================================================
