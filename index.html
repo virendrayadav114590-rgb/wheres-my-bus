@@ -489,7 +489,147 @@ function showError(error){
       Please check Supabase table/column names.
     </div>`;
 }
+/* =========================
+   LIVE BUS TRACKING
+   ========================= */
 
+let busMap;
+let busMarkers = {};
+
+function initBusMap() {
+
+    busMap = L.map("map").setView([26.8467, 80.9462], 12);
+
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            attribution: "&copy; OpenStreetMap contributors"
+        }
+    ).addTo(busMap);
+
+    loadBusLocations();
+}
+
+
+/* Load current bus locations */
+
+async function loadBusLocations() {
+
+    const { data, error } = await supabaseClient
+        .from("bus_locations")
+        .select("*")
+        .eq("is_active", true);
+
+    if (error) {
+        console.error("Location error:", error);
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        console.log("No active buses found");
+        return;
+    }
+
+    data.forEach(bus => {
+        updateBusMarker(bus);
+    });
+}
+
+
+/* Create / update bus marker */
+
+function updateBusMarker(bus) {
+
+    if (!bus.latitude || !bus.longitude) {
+        return;
+    }
+
+    const lat = Number(bus.latitude);
+    const lng = Number(bus.longitude);
+
+    const popup = `
+        <div>
+            <strong>🚌 ${bus.bus_number || "Bus"}</strong><br>
+            Speed: ${bus.speed_kmh || 0} km/h<br>
+            Heading: ${bus.heading || 0}°<br>
+            Status: ${bus.status || "Active"}
+        </div>
+    `;
+
+    if (busMarkers[bus.bus_number]) {
+
+        busMarkers[bus.bus_number]
+            .setLatLng([lat, lng])
+            .setPopupContent(popup);
+
+    } else {
+
+        const marker = L.marker([lat, lng])
+            .addTo(busMap)
+            .bindPopup(popup);
+
+        busMarkers[bus.bus_number] = marker;
+    }
+}
+
+
+/* =========================
+   REALTIME BUS LOCATION
+   ========================= */
+
+supabaseClient
+    .channel("live-bus-locations")
+    .on(
+        "postgres_changes",
+        {
+            event: "*",
+            schema: "public",
+            table: "bus_locations"
+        },
+        payload => {
+
+            console.log("Live location update:", payload);
+
+            if (payload.eventType === "DELETE") {
+
+                const oldBus = payload.old;
+
+                if (oldBus && oldBus.bus_number) {
+
+                    if (busMarkers[oldBus.bus_number]) {
+
+                        busMap.removeLayer(
+                            busMarkers[oldBus.bus_number]
+                        );
+
+                        delete busMarkers[oldBus.bus_number];
+                    }
+                }
+
+                return;
+            }
+
+            const bus = payload.new;
+
+            if (bus && bus.is_active) {
+                updateBusMarker(bus);
+            }
+        }
+    )
+    .subscribe(status => {
+
+        console.log("Realtime status:", status);
+
+    });
+
+
+/* Start map */
+
+window.addEventListener("load", function () {
+
+    initBusMap();
+
+});
 </script>
 
 </body>
