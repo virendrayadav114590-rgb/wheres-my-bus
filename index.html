@@ -493,19 +493,20 @@ async function loadBuses(){
    LOAD LIVE LOCATIONS
    ========================================================= */
 
-async function loadBusLocations(){
 
-  if(!mapReady){
-    initBusMap();
+  async function loadBusLocations(){
+
+  if(mapReady){
+    initMap();
   }
 
-  const {data,error} =
-    await supabaseClient
-      .from("bus_locations")
-      .select("*");
+  const { data, error } = await supabaseClient
+    .from("bus_locations")
+    .select("*")
+    .order("updated_at", { ascending: false });
 
   if(error){
-    console.error("Error loading locations:",error);
+    console.error("Error loading locations:", error);
     return;
   }
 
@@ -516,7 +517,20 @@ async function loadBusLocations(){
     return;
   }
 
+  // Keep only the latest location of each bus
+  const latestLocations = new Map();
+
   data.forEach(location => {
+
+    const busId = String(location.bus_id);
+
+    if(!latestLocations.has(busId)){
+      latestLocations.set(busId, location);
+    }
+
+  });
+
+  latestLocations.forEach(location => {
 
     const bus = allBuses.find(
       b => String(b.id) === String(location.bus_id)
@@ -526,13 +540,17 @@ async function loadBusLocations(){
 
     addBusMarker(
       bus,
-      location.latitude,
-      location.longitude
+      Number(location.latitude),
+      Number(location.longitude)
     );
+
   });
 
-  console.log("Bus locations loaded:",data.length);
-}
+  console.log(
+    "Latest bus locations loaded:",
+    latestLocations.size
+  );
+  }
 // ================================================
 // ROUTE STOPS
 // ================================================
