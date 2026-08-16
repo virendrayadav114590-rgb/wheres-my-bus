@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where's My Bus?</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  background:#f4f7fb;
+  color:#1f2937;
+}
+
+header{
+  background:#087f73;
+  color:white;
+  text-align:center;
+  padding:28px 16px;
+}
+
+header h1{font-size:32px;margin-bottom:8px}
+header p{font-size:17px}
+
+.container{
+  width:100%;
+  max-width:700px;
+  margin:25px auto;
+  padding:0 16px;
+}
+
+.search-box{
+  background:white;
+  padding:22px;
+  border-radius:20px;
+  box-shadow:0 5px 20px rgba(0,0,0,.08);
+}
+
+.search-box h2{margin-bottom:18px;font-size:25px}
+
+input,select{
+  width:100%;
+  padding:15px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  font-size:16px;
+  margin-bottom:12px;
+  outline:none;
+  background:white;
+}
+
+input:focus,select:focus{
+  border-color:#087f73;
+  box-shadow:0 0 0 2px rgba(8,127,115,.12);
+}
+
+button{
+  width:100%;
+  padding:15px;
+  border:none;
+  border-radius:12px;
+  background:#087f73;
+  color:white;
+  font-size:17px;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+button:hover{background:#09665e}
+
+.quick-search{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-top:15px;
+}
+
+.quick-search button{
+  background:#e6fffb;
+  color:#087f73;
+  font-size:15px;
+  padding:13px 5px;
+}
+
+.quick-search button:hover{background:#ccfbf1}
+
+.results{margin-top:20px}
+
+.result-card{
+  background:white;
+  padding:18px;
+  border-radius:15px;
+  margin-bottom:12px;
+  box-shadow:0 4px 15px rgba(0,0,0,.07);
+}
+
+.result-card h3{color:#087f73;margin-bottom:10px}
+.result-card p{margin:7px 0;font-size:15px}
+
+.status{
+  display:inline-block;
+  margin-top:8px;
+  padding:7px 12px;
+  border-radius:20px;
+  background:#dcfce7;
+  color:#166534;
+  font-size:13px;
+  font-weight:bold;
+}
+
+.status.inactive{
+  background:#fee2e2;
+  color:#991b1b;
+}
+
+.empty{
+  text-align:center;
+  padding:25px;
+  color:#6b7280;
+}
+
+.loading{
+  text-align:center;
+  padding:20px;
+  color:#087f73;
+  font-weight:bold;
+}
+
+.error{
+  background:#fff1f2;
+  color:#be123c;
+  padding:15px;
+  border-radius:12px;
+  margin-bottom:12px;
+  line-height:1.5;
+}
+
+#map{
+  width:100%;
+  height:430px;
+  margin-top:25px;
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 5px 18px rgba(0,0,0,.12);
+}
+
+.map-title{
+  margin-top:25px;
+  margin-bottom:10px;
+  font-size:22px;
+  color:#087f73;
+  font-weight:bold;
+}
+
+.map-info{
+  background:white;
+  padding:15px;
+  border-radius:14px;
+  margin-top:12px;
+  font-size:14px;
+  box-shadow:0 3px 12px rgba(0,0,0,.06);
+}
+
+footer{
+  text-align:center;
+  padding:30px 10px;
+  color:#6b7280;
+  font-size:13px;
+}
+
+/* Professional bus marker */
+.bus-marker-icon{
+  width:46px;
+  height:46px;
+  background:#087f73;
+  border:4px solid white;
+  border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 3px 10px rgba(0,0,0,.35);
+}
+
+.bus-marker-icon::before{
+  content:"🚌";
+  font-size:23px;
+  transform:rotate(45deg);
+}
+
+.bus-marker-icon{
+  font-size:0;
+}
+
+@media(max-width:600px){
+  header h1{font-size:30px}
+  header p{font-size:16px}
+  .container{margin-top:20px}
+  .search-box{padding:18px}
+  .quick-search{gap:8px}
+  .quick-search button{font-size:14px}
+  #map{height:380px}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🚌 Where's My Bus?</h1>
+  <p>Find buses, routes and stops easily</p>
+</header>
+
+<div class="container">
+
+  <div class="search-box">
+    <h2>🔎 Search Bus</h2>
+
+    <select id="searchType">
+      <option value="bus">Bus Number</option>
+      <option value="route">Route</option>
+      <option value="stop">Bus Stop</option>
+    </select>
+
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Enter bus number..."
+      autocomplete="off"
+    >
+
+    <!-- IMPORTANT: type=button prevents accidental form submission -->
+    <button id="searchButton" type="button">Search</button>
+
+    <div class="quick-search">
+      <button type="button" onclick="quickSearch('bus')">🚌 Bus</button>
+      <button type="button" onclick="quickSearch('route')">🛣️ Route</button>
+      <button type="button" onclick="quickSearch('stop')">📍 Stop</button>
+    </div>
+  </div>
+
+  <div id="results" class="results">
+    <div class="empty">Search for a bus, route or stop</div>
+  </div>
+
+  <div class="map-title">🗺️ Live Bus Tracking</div>
+  <div id="map"></div>
+
+  <div class="map-info">
+    📡 Live location updates are connected to Supabase.
+  </div>
+</div>
+
+<footer>
+  Where's My Bus 🚌 | Powered by Supabase
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+/* =========================================================
+   SUPABASE
+   ========================================================= */
+
+const SUPABASE_URL = "https://zfbeauaerfaxarqicvgb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Q3aYd1Fp4q1lpK2Kcxgd4g_uO0Ba0e";
+
+const supabaseClient = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+/* =========================================================
+   GLOBALS
+   ========================================================= */
+
+let busMap = null;
+let busMarkers = {};
+let allBuses = [];
+let mapReady = false;
+
+/* =========================================================
+   DOM
+   ========================================================= */
+
+const searchType = document.getElementById("searchType");
+const searchInput = document.getElementById("searchInput");
+const searchButton = document.getElementById("searchButton");
+const results = document.getElementById("results");
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
+function escapeHTML(value){
+  if(value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
+function updatePlaceholder(){
+  const type = searchType.value;
+
+  if(type === "bus"){
+    searchInput.placeholder = "Enter bus number...";
+  }else if(type === "route"){
+    searchInput.placeholder = "Enter route...";
+  }else{
+    searchInput.placeholder = "Enter bus stop...";
+  }
+}
+
+function showLoading(){
+  results.innerHTML = '<div class="loading">⏳ Searching...</div>';
+}
+
+function showError(error){
+  console.error(error);
+
+  const message =
+    error?.message ||
+    error?.details ||
+    "Unknown error";
+
+  results.innerHTML = `
+    <div class="error">
+      <strong>⚠️ Error</strong><br><br>
+      ${escapeHTML(message)}
+    </div>
+  `;
+}
+
+function showEmpty(message){
+  results.innerHTML = `
+    <div class="empty">${escapeHTML(message)}</div>
+  `;
+}
+
+function getLocationStatus(updatedAt){
+  if(!updatedAt){
+    return {
+      label:"🔴 Offline",
+      className:"inactive",
+      text:"No live location received"
+    };
+  }
+
+  const updated = new Date(updatedAt);
+  const seconds = Math.max(0, Math.floor((Date.now() - updated.getTime()) / 1000));
+
+  if(seconds <= 60){
+    return {
+      label:"🟢 Live",
+      className:"",
+      text:`Updated ${seconds} sec ago`
+    };
+  }
+
+  if(seconds <= 300){
+    const minutes = Math.floor(seconds / 60);
+    return {
+      label:"🟡 Stale",
+      className:"",
+      text:`Updated ${minutes} min ago`
+    };
+  }
+
+  return {
+    label:"🔴 Offline",
+    className:"inactive",
+    text:`Last update ${Math.floor(seconds / 60)} min ago`
+  };
+}
+
+/* =========================================================
+   MAP
+   ========================================================= */
+
+function initBusMap(){
+
+  if(busMap) return;
+
+  const mapElement = document.getElementById("map");
+
+  if(!mapElement){
+    console.error("Map element not found");
+    return;
+  }
+
+  busMap = L.map("map").setView(
+    [26.8467,80.9462],
+    12
+  );
+
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom:19,
+      attribution:"&copy; OpenStreetMap contributors"
+    }
+  ).addTo(busMap);
+
+  mapReady = true;
+}
+
+function clearMarkers(){
+
+  Object.values(busMarkers).forEach(marker => {
+    if(busMap && busMap.hasLayer(marker)){
+      busMap.removeLayer(marker);
+    }
+  });
+
+  busMarkers = {};
+}
+
+/* =========================================================
+   BUS MARKER
+   ========================================================= */
+
+function addBusMarker(bus, latitude, longitude){
+
+  if(!busMap) return;
+
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if(!Number.isFinite(lat) || !Number.isFinite(lng)){
+    return;
+  }
+
+  const icon = L.divIcon({
+    className:"bus-marker",
+    html:'<div class="bus-marker-icon"></div>',
+    iconSize:[46,46],
+    iconAnchor:[23,46]
+  });
+
+  const marker = L.marker(
+    [lat,lng],
+    {icon}
+  ).addTo(busMap);
+
+  const route =
+    bus.route_name ||
+    bus.route ||
+    "-";
+
+  marker.bindPopup(`
+    <div style="font-size:15px;line-height:1.6">
+      <strong>🚌 ${escapeHTML(bus.bus_number || "-")}</strong><br>
+      ${escapeHTML(bus.bus_name || "")}<br>
+      🛣️ ${escapeHTML(route)}<br>
+      📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
+    </div>
+  `);
+
+  busMarkers[String(bus.id)] = marker;
+}
+
+/* =========================================================
+   LOAD BUSES
+   ========================================================= */
+
+async function loadBuses(){
+
+  const {data,error} =
+    await supabaseClient
+      .from("buses")
+      .select("*")
+      .order("bus_number");
+
+  if(error){
+    console.error("Error loading buses:",error);
+    return;
+  }
+
+  allBuses = data || [];
+
+  console.log("Buses loaded:",allBuses.length);
+}
+
+/* =========================================================
+   LOAD LIVE LOCATIONS
+   ========================================================= */
+
+async function loadBusLocations(){
+
+  if(!mapReady){
+    initBusMap();
+  }
+
+  const {data,error} =
+    await supabaseClient
+      .from("bus_locations")
+      .select("*");
+
+  if(error){
+    console.error("Error loading locations:",error);
+    return;
+  }
+
+  clearMarkers();
+
+  if(!data || data.length === 0){
+    console.log("No bus locations available");
+    return;
+  }
+
+  data.forEach(location => {
+
+    const bus = allBuses.find(
+      b => String(b.id) === String(location.bus_id)
+    );
+
+    if(!bus) return;
+
+    addBusMarker(
+      bus,
+      location.latitude,
+      location.longitude
+    );
+  });
+
+  console.log("Bus locations loaded:",data.length);
+}
+
+/* =========================================================
+   BUS SEARCH
+   ========================================================= */
+
+async function searchBus(value = searchInput.value){
+
+  const text = String(value || "").trim();
+
+  if(!text){
+    showEmpty("Please enter a bus number.");
+    return;
+  }
+
+  showLoading();
+
+  const {data,error} =
+    await supabaseClient
+      .from("buses")
+      .select("*")
+      .ilike("bus_number",`%${text}%`);
+
+  if(error){
+    showError(error);
+    return;
+  }
+
+  if(!data || data.length === 0){
+    showEmpty("🚌 No bus found.");
+    return;
+  }
+
+  results.innerHTML = "";
+
+  for(const bus of data){
+
+    const {data:locations,error:locationError} =
+      await supabaseClient
+        .from("bus_locations")
+        .select("*")
+        .eq("bus_id",bus.id)
+        .order("updated_at",{ascending:false})
+        .limit(1);
+
+    if(locationError){
+      console.warn("Location lookup:",locationError);
+    }
+
+    const location =
+      locations && locations.length
+        ? locations[0]
+        : null;
+
+    const route =
+      bus.route_name ||
+      bus.route ||
+      "-";
+
+    const status =
+      bus.status ||
+      "Active";
+
+    const inactive =
+      String(status).toLowerCase() === "inactive";
+
+    const liveStatus = getLocationStatus(
+      location?.updated_at
+    );
+
+    results.innerHTML += `
+      <div class="result-card">
+        <h3>🚌 ${escapeHTML(bus.bus_number || "-")}</h3>
+
+        <p>
+          <strong>Bus Name:</strong>
+          ${escapeHTML(bus.bus_name || "UPSRTC Bus")}
+        </p>
+
+        <p>
+          🛣️ <strong>Route:</strong>
+          ${escapeHTML(route)}
+        </p>
+
+        ${
+          bus.stop_name || bus.stop
+          ? `
+          <p>
+            📍 <strong>Stop:</strong>
+            ${escapeHTML(bus.stop_name || bus.stop)}
+          </p>
+          `
+          : ""
+        }
+
+        <span class="status ${inactive ? "inactive" : ""}">
+          ${escapeHTML(status)}
+        </span>
+
+        <div style="margin-top:10px;font-weight:bold">
+          ${escapeHTML(liveStatus.label)}
+        </div>
+
+        <div style="margin-top:5px;color:#6b7280;font-size:13px">
+          ${escapeHTML(liveStatus.text)}
+        </div>
+      </div>
+    `;
+
+    if(location){
+
+      const lat = Number(location.latitude);
+      const lng = Number(location.longitude);
+
+      if(Number.isFinite(lat) && Number.isFinite(lng)){
+
+        initBusMap();
+
+        busMap.setView([lat,lng],15);
+
+        const marker =
+          busMarkers[String(bus.id)];
+
+        if(marker){
+          marker.openPopup();
+        }else{
+          addBusMarker(
+            bus,
+            lat,
+            lng
+          );
+
+          const newMarker =
+            busMarkers[String(bus.id)];
+
+          if(newMarker){
+            newMarker.openPopup();
+          }
+        }
+      }
+    }
+  }
+}
+
+/* =========================================================
+   ROUTE SEARCH
+   ========================================================= */
+
+async function searchRoute(value){
+
+  const text = String(value || "").trim();
+
+  if(!text){
+    showEmpty("Please enter a route.");
+    return;
+  }
+
+  showLoading();
+
+  let data = null;
+  let error = null;
+
+  /* Prefer the confirmed route column */
+  const first =
+    await supabaseClient
+      .from("buses")
+      .select("*")
+      .ilike("route",`%${text}%`);
+
+  if(!first.error){
+    data = first.data || [];
+  }else{
+
+    const second =
+      await supabaseClient
+        .from("buses")
+        .select("*")
+        .ilike("route_name",`%${text}%`);
+
+    data = second.data || [];
+    error = second.error;
+  }
+
+  if(error){
+    showError(error);
+    return;
+  }
+
+  if(!data.length){
+    showEmpty("🛣️ No route found.");
+    return;
+  }
+
+  results.innerHTML =
+    data.map(bus => {
+
+      const route =
+        bus.route_name ||
+        bus.route ||
+        "-";
+
+      return `
+        <div class="result-card">
+          <h3>🛣️ ${escapeHTML(route)}</h3>
+
+          <p>
+            🚌 <strong>Bus:</strong>
+            ${escapeHTML(bus.bus_number || "-")}
+          </p>
+
+          <p>
+            <strong>Bus Name:</strong>
+            ${escapeHTML(bus.bus_name || "-")}
+          </p>
+
+          ${
+            bus.stop || bus.stop_name
+            ? `
+              <p>
+                📍 <strong>Stop:</strong>
+                ${escapeHTML(bus.stop || bus.stop_name)}
+              </p>
+            `
+            : ""
+          }
+        </div>
+      `;
+    }).join("");
+}
+
+/* =========================================================
+   STOP SEARCH
+   ========================================================= */
+
+async function searchStop(value){
+
+  const text = String(value || "").trim();
+
+  if(!text){
+    showEmpty("Please enter a bus stop.");
+    return;
+  }
+
+  showLoading();
+
+  const {data,error} =
+    await supabaseClient
+      .from("bus_stops")
+      .select("*")
+      .or(
+        `stop_name.ilike.%${text}%,city.ilike.%${text}%`
+      );
+
+  if(error){
+    showError(error);
+    return;
+  }
+
+  if(!data || !data.length){
+    showEmpty("📍 No bus stop found.");
+    return;
+  }
+
+  const busIds =
+    [...new Set(
+      data
+        .map(stop => stop.bus_id)
+        .filter(Boolean)
+    )];
+
+  let buses = [];
+
+  if(busIds.length){
+
+    const response =
+      await supabaseClient
+        .from("buses")
+        .select("*")
+        .in("id",busIds);
+
+    if(response.error){
+      showError(response.error);
+      return;
+    }
+
+    buses = response.data || [];
+  }
+
+  results.innerHTML =
+    data.map(stop => {
+
+      const bus =
+        buses.find(
+          b => String(b.id) === String(stop.bus_id)
+        );
+
+      const route =
+        bus?.route_name ||
+        bus?.route ||
+        "-";
+
+      return `
+        <div class="result-card">
+
+          <h3>
+            📍 ${escapeHTML(stop.stop_name || "-")}
+          </h3>
+
+          <p>
+            🏙️ <strong>City:</strong>
+            ${escapeHTML(stop.city || "-")}
+          </p>
+
+          ${
+            bus
+            ? `
+              <p>
+                🚌 <strong>Bus:</strong>
+                ${escapeHTML(bus.bus_number || "-")}
+              </p>
+
+              <p>
+                <strong>Bus Name:</strong>
+                ${escapeHTML(bus.bus_name || "-")}
+              </p>
+
+              <p>
+                🛣️ <strong>Route:</strong>
+                ${escapeHTML(route)}
+              </p>
+            `
+            : ""
+          }
+
+        </div>
+      `;
+    }).join("");
+}
+
+/* =========================================================
+   MAIN SEARCH
+   ========================================================= */
+
+async function performSearch(){
+
+  const type = searchType.value;
+  const value = searchInput.value.trim();
+
+  if(!value){
+    showEmpty("Please enter something to search.");
+    return;
+  }
+
+  try{
+
+    if(type === "bus"){
+      await searchBus(value);
+    }
+    else if(type === "route"){
+      await searchRoute(value);
+    }
+    else if(type === "stop"){
+      await searchStop(value);
+    }
+
+  }catch(error){
+    showError(error);
+  }
+}
+
+/* =========================================================
+   SEARCH BUTTON
+   ========================================================= */
+
+searchButton.addEventListener(
+  "click",
+  function(){
+    performSearch();
+  }
+);
+
+/* =========================================================
+   ENTER KEY
+   ========================================================= */
+
+searchInput.addEventListener(
+  "keydown",
+  function(event){
+
+    if(event.key === "Enter"){
+      event.preventDefault();
+      performSearch();
+    }
+
+  }
+);
+
+/* =========================================================
+   QUICK SEARCH
+   ========================================================= */
+
+function quickSearch(type){
+
+  searchType.value = type;
+  updatePlaceholder();
+  searchInput.focus();
+}
+
+/* =========================================================
+   REALTIME
+   ========================================================= */
+
+function subscribeRealtime(){
+
+  supabaseClient
+    .channel("bus-location-updates")
+    .on(
+      "postgres_changes",
+      {
+        event:"*",
+        schema:"public",
+        table:"bus_locations"
+      },
+      async function(payload){
+
+        console.log(
+          "Live location update:",
+          payload
+        );
+
+        await loadBusLocations();
+      }
+    )
+    .subscribe(status => {
+
+      console.log(
+        "Realtime status:",
+        status
+      );
+
+    });
+}
+
+/* =========================================================
+   PERIODIC REFRESH
+   ========================================================= */
+
+setInterval(
+  async function(){
+    await loadBusLocations();
+  },
+  30000
+);
+
+/* =========================================================
+   START
+   ========================================================= */
+
+window.addEventListener(
+  "load",
+  async function(){
+
+    console.log(
+      "🚌 Where's My Bus starting..."
+    );
+
+    initBusMap();
+
+    await loadBuses();
+
+    await loadBusLocations();
+
+    subscribeRealtime();
+
+    console.log(
+      "🚌 Where's My Bus ready."
+    );
+
+  }
+);
+</script>
+
+</body>
+</html>
