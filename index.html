@@ -241,8 +241,8 @@ searchInput.parentNode.insertBefore(
 );
   searchInput.style.display = "none";
 busSelect.style.display = "block";
-loadBuses();
-  async function loadBuses(){
+
+async function loadBuses(){
 
     const { data, error } = await supabaseClient
         .from("buses")
@@ -267,19 +267,19 @@ loadBuses();
             (bus.bus_name ? " - " + bus.bus_name : "");
 
         busSelect.appendChild(option);
-
     });
 
     if(data.length > 0){
 
         busSelect.value = data[0].bus_number;
-
         searchInput.value = data[0].bus_number;
 
         searchBus();
-
     }
-  }
+}
+
+loadBuses();
+
 searchType.addEventListener("change", function(){
 
     if(this.value === "bus"){
@@ -295,18 +295,15 @@ searchType.addEventListener("change", function(){
         busSelect.style.display = "none";
 
         if(this.value === "route"){
-            searchInput.placeholder =
-            "Enter route name...";
+            searchInput.placeholder = "Enter route name...";
         }
 
         if(this.value === "stop"){
-            searchInput.placeholder =
-            "Enter bus stop...";
+            searchInput.placeholder = "Enter bus stop...";
         }
-
     }
-
 });
+
 
 
 /* =========================
@@ -323,10 +320,7 @@ function quickSearch(type){
 
   searchInput.focus();
 }
-// AUTO SEARCH DEFAULT BUS
-searchType.value = "bus";
-searchInput.value = "UP32AB1234";
-searchBus();
+
 
 /* =========================
    MAIN SEARCH
