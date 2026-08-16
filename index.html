@@ -522,9 +522,8 @@ function initBusMap() {
 async function loadBusLocations() {
 
     const { data, error } = await supabaseClient
-        .from("bus_locations")
-        .select("*")
-        .eq("is_active", true);
+    .from("bus_locations")
+    .select("*");
 
     if (error) {
         console.error("Location error:", error);
