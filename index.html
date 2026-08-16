@@ -239,6 +239,9 @@ searchInput.parentNode.insertBefore(
     busSelect,
     searchInput
 );
+  searchInput.style.display = "none";
+busSelect.style.display = "block";
+loadBuses();
   async function loadBuses(){
 
     const { data, error } = await supabaseClient
