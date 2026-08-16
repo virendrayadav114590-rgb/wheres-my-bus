@@ -546,8 +546,8 @@ async function loadBusLocations() {
 
 function updateBusMarker(bus) {
 
-    if (!bus.latitude || !bus.longitude) {
-        return;
+    if (bus.latitude == null || bus.longitude == null) {
+    return;
     }
 
     const lat = Number(bus.latitude);
