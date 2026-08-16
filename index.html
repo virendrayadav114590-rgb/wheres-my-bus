@@ -505,28 +505,44 @@ async function searchBus(){
     }
 
     results.innerHTML =
-      data.map(stop => `
+  (
+    await Promise.all(
+      data.map(async stop => {
 
-        <div class="result-card">
+        const { data: bus } = await supabaseClient
+          .from("buses")
+          .select("bus_number,bus_name,route_name,stop")
+          .eq("id", stop.bus_id)
+          .maybeSingle();
 
-          <h3>
-            📍 ${stop.stop_name || "-"}
-          </h3>
+        return `
+          <div class="result-card">
 
-          <p>
-            🏙️ City:
-            ${stop.city || "-"}
-          </p>
+            <h3>
+              📍 ${stop.stop_name || "-"}
+            </h3>
 
-          <p>
-            🚌 Bus ID:
-            ${stop.bus_id || "-"}
-          </p>
+            <p>
+              🏙️ City:
+              ${stop.city || "-"}
+            </p>
 
-        </div>
+            <p>
+              🚌 Bus:
+              ${bus?.bus_number || stop.bus_id || "-"}
+              ${bus?.bus_name ? " - " + bus.bus_name : ""}
+            </p>
 
-      `).join("");
+            <p>
+              🛣️ Route:
+              ${bus?.route_name || "-"}
+            </p>
 
+          </div>
+        `;
+      })
+    )
+  ).join("");
     return;
   }
 
