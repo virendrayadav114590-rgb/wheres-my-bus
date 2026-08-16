@@ -658,7 +658,23 @@ if(Number.isFinite(routeId) && routeId > 0){
           🛣️ <strong>Route:</strong>
           ${escapeHTML(route)}
         </p>
-
+${
+  routeStops.length
+    ? `
+      <div style="margin-top:10px;">
+        <strong>📍 Route Stops:</strong>
+        <ol style="margin-top:6px;padding-left:22px;">
+          ${routeStops.map(stop => `
+            <li>
+              ${escapeHTML(stop.stop_name || "-")}
+              ${stop.city ? ` - ${escapeHTML(stop.city)}` : ""}
+            </li>
+          `).join("")}
+        </ol>
+      </div>
+    `
+    : ""
+}
         ${
           bus.stop_name || bus.stop
           ? `
